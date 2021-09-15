@@ -11,7 +11,7 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"net"
@@ -30,10 +30,13 @@ const (
 	QUERY
 )
 
+const DB_FILE string = "data.bin"
+
 func main() {
 	flag.Parse()
 
 	fmt.Println("Starting server...")
+	// os.Remove(DB_FILE)
 
 	src := *addr + ":" + strconv.Itoa(*port)
 	listener, _ := net.Listen("tcp", src)
@@ -57,6 +60,8 @@ func handleConnection(conn net.Conn) {
 
 	scanner := bufio.NewScanner(conn)
 
+	var mode ConnectionMode = NONE
+
 	for {
 		ok := scanner.Scan()
 
@@ -64,13 +69,24 @@ func handleConnection(conn net.Conn) {
 			break
 		}
 
-		handleMessage(scanner.Text(), conn)
+		_mode, _, data := handleMessage(scanner.Text(), conn)
+
+		switch mode {
+		case NONE:
+			mode = _mode
+		case INSERT:
+			insertData(data)
+		}
 	}
 
 	fmt.Println("Client at " + remoteAddr + " disconnected.")
+
+	if mode == INSERT {
+		os.Remove(DB_FILE)
+	}
 }
 
-func handleMessage(message string, conn net.Conn) (mode ConnectionMode, query string) {
+func handleMessage(message string, conn net.Conn) (mode ConnectionMode, query string, data []byte) {
 	fmt.Println("> " + message)
 
 	if len(message) > 0 && message[0] == '/' {
@@ -90,12 +106,39 @@ func handleMessage(message string, conn net.Conn) (mode ConnectionMode, query st
 			conn.Write([]byte("Unrecognized command.\n"))
 		}
 	} else {
-		var data map[string]interface{}
-		if err := json.Unmarshal([]byte(message), &data); err != nil {
-			panic(err)
-		}
-		fmt.Printf("data: %v\n", data)
+		// if err := json.Unmarshal([]byte(message), &data); err != nil {
+		// 	panic(err)
+		// }
+		// fmt.Printf("data: %v\n", data)
+		data = []byte(message)
 	}
 
 	return
+}
+
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
+
+func insertData(data []byte) {
+	f, err := os.OpenFile(DB_FILE, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	check(err)
+
+	defer f.Close()
+
+	var len int64 = int64(len(data))
+
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, uint64(len))
+	n, err := f.Write(b)
+	check(err)
+	fmt.Printf("wrote %d bytes\n", n)
+
+	n, err = f.Write(data)
+	check(err)
+	fmt.Printf("wrote %d bytes\n", n)
+
+	f.Sync()
 }

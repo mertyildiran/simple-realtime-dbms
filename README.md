@@ -17,11 +17,11 @@ Hey, look, it uses `flag`, how quaint!
 
 Run the server like so:
 
-`go run server.go -port 8000`
+`go run server/server.go -port 8000`
 
 And then connect to it with the client like so:
 
-`go run client.go -host localhost -port 8000`
+`go run client/client.go -host localhost -port 8000`
 
 The command line arguments shown are the default values, you can omit them to
 connect to localhost on port 8000. Or, of course, you can connect to some other

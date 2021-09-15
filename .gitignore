@@ -12,4 +12,8 @@
 *.out
 
 
+# Editor
 .vscode/
+
+# Database File
+data.bin
