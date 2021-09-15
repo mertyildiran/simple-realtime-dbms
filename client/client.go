@@ -25,17 +25,28 @@ var host = flag.String("host", "localhost", "The hostname or IP to connect to; d
 var port = flag.Int("port", 8000, "The port to connect to; defaults to 8000.")
 
 type Car struct {
-	Model string `json:"model"`
-	Brand string `json:"brand"`
-	Year  int    `json:"year"`
+	Id    int      `json:"id"`
+	Model string   `json:"model"`
+	Brand CarBrand `json:"brand"`
+	Year  int      `json:"year"`
+}
+
+type CarBrand struct {
+	Name string `json:"name"`
 }
 
 type School struct {
-	Name       string  `json:"name"`
-	Address    string  `json:"address"`
-	Enrollment int     `json:"enrollment"`
-	Score      float64 `json:"score"`
-	Year       int     `json:"year"`
+	Id         int          `json:"id"`
+	Name       string       `json:"name"`
+	League     SchoolLeague `json:"league"`
+	Address    string       `json:"address"`
+	Enrollment int          `json:"enrollment"`
+	Score      float64      `json:"score"`
+	Year       int          `json:"year"`
+}
+
+type SchoolLeague struct {
+	Name string `json:"name"`
 }
 
 func main() {
@@ -43,12 +54,17 @@ func main() {
 
 	a := &Car{
 		Model: "Camaro",
-		Brand: "Chevrolet",
-		Year:  2021,
+		Brand: CarBrand{
+			Name: "Chevrolet",
+		},
+		Year: 2021,
 	}
 
 	b := &School{
-		Name:       "Harvard",
+		Name: "Harvard",
+		League: SchoolLeague{
+			Name: "Ivy",
+		},
 		Address:    "Massachusetts",
 		Enrollment: 5000,
 		Score:      4.8,
@@ -80,12 +96,14 @@ func main() {
 	go readConnection(conn)
 
 	var data []byte
-	for i := 1; i < 100; i++ {
+	for i := 1; i < 101; i++ {
 		conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 
 		if i%2 == 1 {
+			b.Id = i
 			data, _ = json.Marshal(b)
 		} else {
+			a.Id = i
 			data, _ = json.Marshal(a)
 		}
 
