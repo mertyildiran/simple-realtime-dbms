@@ -17,11 +17,18 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"time"
 )
 
 var addr = flag.String("addr", "", "The address to listen to; default is \"\" (all interfaces).")
 var port = flag.Int("port", 8000, "The port to listen on; default is 8000.")
+
+type ConnectionMode int
+
+const (
+	NONE ConnectionMode = iota
+	INSERT
+	QUERY
+)
 
 func main() {
 	flag.Parse()
@@ -63,15 +70,14 @@ func handleConnection(conn net.Conn) {
 	fmt.Println("Client at " + remoteAddr + " disconnected.")
 }
 
-func handleMessage(message string, conn net.Conn) {
+func handleMessage(message string, conn net.Conn) (mode ConnectionMode, query string) {
 	fmt.Println("> " + message)
 
 	if len(message) > 0 && message[0] == '/' {
 		switch {
-		case message == "/time":
-			resp := "It is " + time.Now().String() + "\n"
-			fmt.Print("< " + resp)
-			conn.Write([]byte(resp))
+		case message == "/insert":
+			mode = INSERT
+			return
 
 		case message == "/quit":
 			fmt.Println("Quitting.")
@@ -90,4 +96,6 @@ func handleMessage(message string, conn net.Conn) {
 		}
 		fmt.Printf("data: %v\n", data)
 	}
+
+	return
 }

@@ -71,14 +71,6 @@ func main() {
 		Year:       1636,
 	}
 
-	// data, _ := json.Marshal(a)
-
-	// fmt.Printf("data: %v\n", string(data))
-
-	// data, _ = json.Marshal(b)
-
-	// fmt.Printf("data: %v\n", string(data))
-
 	dest := *host + ":" + strconv.Itoa(*port)
 	fmt.Printf("Connecting to %s...\n", dest)
 
@@ -95,10 +87,12 @@ func main() {
 
 	go readConnection(conn)
 
+	conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
+	conn.Write([]byte("/insert\n"))
+
 	var data []byte
 	for i := 1; i < 101; i++ {
 		conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
-
 		if i%2 == 1 {
 			b.Id = i
 			data, _ = json.Marshal(b)
