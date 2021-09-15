@@ -11,6 +11,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -82,5 +83,11 @@ func handleMessage(message string, conn net.Conn) {
 		default:
 			conn.Write([]byte("Unrecognized command.\n"))
 		}
+	} else {
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(message), &data); err != nil {
+			panic(err)
+		}
+		fmt.Printf("data: %v\n", data)
 	}
 }

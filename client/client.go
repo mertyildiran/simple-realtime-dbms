@@ -11,6 +11,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -23,8 +24,44 @@ import (
 var host = flag.String("host", "localhost", "The hostname or IP to connect to; defaults to \"localhost\".")
 var port = flag.Int("port", 8000, "The port to connect to; defaults to 8000.")
 
+type Car struct {
+	Model string `json:"model"`
+	Brand string `json:"brand"`
+	Year  int    `json:"year"`
+}
+
+type School struct {
+	Name       string  `json:"name"`
+	Address    string  `json:"address"`
+	Enrollment int     `json:"enrollment"`
+	Score      float64 `json:"score"`
+	Year       int     `json:"year"`
+}
+
 func main() {
 	flag.Parse()
+
+	a := &Car{
+		Model: "Camaro",
+		Brand: "Chevrolet",
+		Year:  2021,
+	}
+
+	b := &School{
+		Name:       "Harvard",
+		Address:    "Massachusetts",
+		Enrollment: 5000,
+		Score:      4.8,
+		Year:       1636,
+	}
+
+	// data, _ := json.Marshal(a)
+
+	// fmt.Printf("data: %v\n", string(data))
+
+	// data, _ = json.Marshal(b)
+
+	// fmt.Printf("data: %v\n", string(data))
 
 	dest := *host + ":" + strconv.Itoa(*port)
 	fmt.Printf("Connecting to %s...\n", dest)
@@ -42,17 +79,21 @@ func main() {
 
 	go readConnection(conn)
 
-	for {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("> ")
-		text, _ := reader.ReadString('\n')
-
+	var data []byte
+	for i := 1; i < 100; i++ {
 		conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
-		_, err := conn.Write([]byte(text))
-		if err != nil {
-			fmt.Println("Error writing to stream.")
-			break
+
+		if i%2 == 1 {
+			data, _ = json.Marshal(b)
+		} else {
+			data, _ = json.Marshal(a)
 		}
+
+		conn.Write(data)
+
+		conn.Write([]byte("\n"))
+
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
