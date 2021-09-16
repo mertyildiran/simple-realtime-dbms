@@ -109,8 +109,7 @@ func main() {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	for {
-	}
+	time.Sleep(1 * time.Hour)
 }
 
 func readConnection(conn net.Conn) {
