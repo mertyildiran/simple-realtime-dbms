@@ -105,7 +105,10 @@ func main() {
 
 		conn.Write([]byte("\n"))
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	for {
 	}
 }
 

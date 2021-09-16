@@ -12,12 +12,17 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+
+	jp "github.com/ohler55/ojg/jp"
+	oj "github.com/ohler55/ojg/oj"
 )
 
 var addr = flag.String("addr", "", "The address to listen to; default is \"\" (all interfaces).")
@@ -32,6 +37,19 @@ const (
 )
 
 const DB_FILE string = "data.bin"
+
+func equ(operand1 string, operand2 string) bool {
+	return operand1 == operand2
+}
+
+func neq(operand1 string, operand2 string) bool {
+	return operand1 != operand2
+}
+
+var operations = map[string]interface{}{
+	"==": equ,
+	"!=": neq,
+}
 
 func main() {
 	flag.Parse()
@@ -112,10 +130,6 @@ func handleMessage(message string, conn net.Conn) (mode ConnectionMode, data []b
 			conn.Write([]byte("Unrecognized command.\n"))
 		}
 	} else {
-		// if err := json.Unmarshal([]byte(message), &data); err != nil {
-		// 	panic(err)
-		// }
-		// fmt.Printf("data: %v\n", data)
 		data = []byte(message)
 	}
 
@@ -149,8 +163,101 @@ func insertData(data []byte) {
 	f.Sync()
 }
 
-func streamRecords(conn net.Conn, data []byte) {
-	query := string(data)
+func streamRecords(conn net.Conn, data []byte) (err error) {
+	var path, value, operator string
+	var qs []string
 
-	conn.Write([]byte(fmt.Sprintf("query: %s\n", query)))
+	query := string(data)
+	// conn.Write([]byte(fmt.Sprintf("query: %s\n", query)))
+
+	for key, _ := range operations {
+		if strings.Contains(query, key) {
+			operator = key
+			qs = strings.Split(query, key)
+		}
+	}
+
+	if operator == "" {
+		err = errors.New("Unidentified operation.")
+	}
+
+	path = strings.TrimSpace(qs[0])
+	value = strings.TrimSpace(qs[1])
+	value = value[1 : len(value)-1]
+
+	fmt.Printf("path: %v\n", path)
+	fmt.Printf("value: %v\n", value)
+	fmt.Printf("operator: %v\n", operator)
+
+	f, err := os.Open(DB_FILE)
+	check(err)
+	f.Seek(0, 0)
+
+	for {
+		l := make([]byte, 8)
+		_, err = io.ReadAtLeast(f, l, 8)
+		if err == io.EOF {
+			break
+		}
+		check(err)
+		length := int(binary.LittleEndian.Uint64(l))
+
+		b := make([]byte, length)
+		_, err = io.ReadAtLeast(f, b, length)
+		if err == io.EOF {
+			break
+		}
+		check(err)
+
+		truth, err := JsonPath(path, string(b), value, operator)
+		check(err)
+
+		if truth {
+			conn.Write([]byte(fmt.Sprintf("%s\n", b)))
+		}
+	}
+
+	return
+}
+
+func JsonPath(path string, text string, ref string, operator string) (truth bool, err error) {
+	obj, err := oj.ParseString(text)
+	if err != nil {
+		return
+	}
+
+	x, err := jp.ParseString(path)
+	if err != nil {
+		return
+	}
+	result := x.Get(obj)
+
+	var exists bool
+	var value string
+
+	if len(result) < 1 {
+		exists = false
+	} else {
+		exists = true
+		switch result[0].(type) {
+		case string:
+			value = result[0].(string)
+		case int64:
+			value = strconv.FormatInt(result[0].(int64), 10)
+		case float64:
+			value = strconv.FormatFloat(result[0].(float64), 'f', 6, 64)
+		case bool:
+			value = strconv.FormatBool(result[0].(bool))
+		case nil:
+			value = "null"
+		default:
+			exists = false
+		}
+	}
+
+	if exists {
+		truth = operations[operator].(func(string, string) bool)(value, ref)
+	}
+
+	return
 }

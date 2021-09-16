@@ -17,7 +17,7 @@ Hey, look, it uses `flag`, how quaint!
 
 Run the server like so:
 
-`go run server/server.go -port 8000`
+`cd server/ && go run server.go -port 8000`
 
 And then connect to it with the clients like so:
 
