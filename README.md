@@ -157,11 +157,17 @@ This time, the records of other struct will be printed.
 Also try the queries below:
 
 `go run client/query.go -host localhost -port 8000 -query "id == 3"`
+
 `go run client/query.go -host localhost -port 8000 -query "model == \"Camaro\""`
+
 `go run client/query.go -host localhost -port 8000 -query "year == 1636"`
+
 `go run client/query.go -host localhost -port 8000 -query "year == 2021"`
+
 `go run client/query.go -host localhost -port 8000 -query "league.name == \"Ivy\""`
+
 `go run client/query.go -host localhost -port 8000 -query "league.name != \"Ivy\""`
+
 `go run client/query.go -host localhost -port 8000 -query "score == 4.8"`
 
 > Note: Closing 10 million records gap took 53 seconds on our tests. Which is equal to `1006M	data.bin` file. (~1GB)
