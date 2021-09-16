@@ -19,9 +19,11 @@ Run the server like so:
 
 `go run server/server.go -port 8000`
 
-And then connect to it with the client like so:
+And then connect to it with the clients like so:
 
-`go run client/client.go -host localhost -port 8000`
+`go run client/insert.go -host localhost -port 8000`
+
+`go run client/query.go -host localhost -port 8000 -query "model == \"Camaro\""`
 
 The command line arguments shown are the default values, you can omit them to
 connect to localhost on port 8000. Or, of course, you can connect to some other

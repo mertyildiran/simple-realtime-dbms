@@ -17,6 +17,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 )
 
 var addr = flag.String("addr", "", "The address to listen to; default is \"\" (all interfaces).")
@@ -69,13 +70,15 @@ func handleConnection(conn net.Conn) {
 			break
 		}
 
-		_mode, _, data := handleMessage(scanner.Text(), conn)
+		_mode, data := handleMessage(scanner.Text(), conn)
 
 		switch mode {
 		case NONE:
 			mode = _mode
 		case INSERT:
 			insertData(data)
+		case QUERY:
+			streamRecords(conn, data)
 		}
 	}
 
@@ -86,7 +89,7 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
-func handleMessage(message string, conn net.Conn) (mode ConnectionMode, query string, data []byte) {
+func handleMessage(message string, conn net.Conn) (mode ConnectionMode, data []byte) {
 	fmt.Println("> " + message)
 
 	if len(message) > 0 && message[0] == '/' {
@@ -94,6 +97,9 @@ func handleMessage(message string, conn net.Conn) (mode ConnectionMode, query st
 		case message == "/insert":
 			mode = INSERT
 			return
+
+		case strings.HasPrefix(message, "/query"):
+			mode = QUERY
 
 		case message == "/quit":
 			fmt.Println("Quitting.")
@@ -141,4 +147,10 @@ func insertData(data []byte) {
 	fmt.Printf("wrote %d bytes\n", n)
 
 	f.Sync()
+}
+
+func streamRecords(conn net.Conn, data []byte) {
+	query := string(data)
+
+	conn.Write([]byte(fmt.Sprintf("query: %s\n", query)))
 }
