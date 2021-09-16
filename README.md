@@ -170,7 +170,7 @@ Also try the queries below:
 
 `go run client/query.go -host localhost -port 8000 -query "score == 4.8"`
 
-> Note: Closing 10 million records gap took 53 seconds on our tests. Which is equal to `1006M	data.bin` file. (~1GB)
+> Note: Closing 10 million records gap took 53 seconds in our tests. Which is equal to `1006M	data.bin` file. (~1GB)
 
 ### Single
 
@@ -184,7 +184,13 @@ It establishes as a **single mode** connection to the server with:
 conn.Write([]byte("/single\n"))
 ```
 
-and retrieves a single record based on the index provided with `-index`.
+and retrieves a single record based on the index provided with `-index`:
+
+```text
+Connecting to localhost:8000...
+** {"id":100,"name":"Harvard","league":{"name":"Ivy"},"address":"Massachusetts","enrollment":5000,"score":4.8,"year":1636}
+>
+```
 
 ## TODOS
 
