@@ -204,3 +204,4 @@ Connecting to localhost:8000...
 - Write a client library for Go and Python.
 - Add tests.
 - Improve logging, introduce debug level.
+- Implement mechanisms to reduce data redundancy.
