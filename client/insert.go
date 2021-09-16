@@ -91,7 +91,8 @@ func main() {
 	conn.Write([]byte("/insert\n"))
 
 	var data []byte
-	for i := 0; i < 100000; i++ {
+	for i := 0; i < 1000000; i++ {
+		fmt.Printf("%d\n", i)
 		conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 		if i%2 == 1 {
 			b.Id = i - 1

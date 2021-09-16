@@ -97,6 +97,13 @@ func main() {
 	}
 }
 
+func periodicFileSyncer(f *os.File) {
+	for {
+		time.Sleep(10 * time.Millisecond)
+		f.Sync()
+	}
+}
+
 func handleConnection(c chan os.Signal, conn net.Conn) {
 	connections = append(connections, conn)
 	remoteAddr := conn.RemoteAddr().String()
@@ -105,6 +112,10 @@ func handleConnection(c chan os.Signal, conn net.Conn) {
 	scanner := bufio.NewScanner(conn)
 
 	var mode ConnectionMode = NONE
+	var f *os.File
+	var err error
+
+	defer f.Close()
 
 	for {
 		ok := scanner.Scan()
@@ -118,8 +129,13 @@ func handleConnection(c chan os.Signal, conn net.Conn) {
 		switch mode {
 		case NONE:
 			mode = _mode
+			if mode == INSERT {
+				f, err = os.OpenFile(DB_FILE, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				check(err)
+				go periodicFileSyncer(f)
+			}
 		case INSERT:
-			insertData(data)
+			insertData(f, data)
 		case QUERY:
 			streamRecords(conn, data)
 		case SINGLE:
@@ -171,12 +187,7 @@ func check(e error) {
 	}
 }
 
-func insertData(data []byte) {
-	f, err := os.OpenFile(DB_FILE, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	check(err)
-
-	defer f.Close()
-
+func insertData(f *os.File, data []byte) {
 	var length int64 = int64(len(data))
 
 	b := make([]byte, 8)
@@ -195,8 +206,6 @@ func insertData(data []byte) {
 		lastOffset := offsets[len(offsets)-1]
 		offsets = append(offsets, lastOffset+8+length)
 	}
-
-	f.Sync()
 }
 
 func readRecord(f *os.File, seek int64) (b []byte, n int64, err error) {
@@ -323,6 +332,10 @@ func JsonPath(path string, text string, ref string, operator string) (truth bool
 
 func retrieveSingle(conn net.Conn, data []byte) (err error) {
 	index, _ := strconv.Atoi(string(data))
+	if index-1 > len(offsets) {
+		conn.Write([]byte(fmt.Sprintf("Index out of range: %d\n", index)))
+		return
+	}
 	n := offsets[index]
 	f, err := os.Open(DB_FILE)
 	check(err)
