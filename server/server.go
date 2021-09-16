@@ -70,6 +70,7 @@ func main() {
 	flag.Parse()
 
 	fmt.Println("Starting server...")
+	os.Remove(DB_FILE)
 
 	src := *addr + ":" + strconv.Itoa(*port)
 	listener, _ := net.Listen("tcp", src)
@@ -249,7 +250,7 @@ func streamRecords(conn net.Conn, data []byte) (err error) {
 
 	path = strings.TrimSpace(qs[0])
 	value = strings.TrimSpace(qs[1])
-	value = value[1 : len(value)-1]
+	value = strings.Trim(value, "\"")
 
 	fmt.Printf("path: %v\n", path)
 	fmt.Printf("value: %v\n", value)
@@ -313,7 +314,7 @@ func JsonPath(path string, text string, ref string, operator string) (truth bool
 		case int64:
 			value = strconv.FormatInt(result[0].(int64), 10)
 		case float64:
-			value = strconv.FormatFloat(result[0].(float64), 'f', 6, 64)
+			value = strconv.FormatFloat(result[0].(float64), 'g', 6, 64)
 		case bool:
 			value = strconv.FormatBool(result[0].(bool))
 		case nil:
@@ -325,6 +326,8 @@ func JsonPath(path string, text string, ref string, operator string) (truth bool
 
 	if exists {
 		truth = operations[operator].(func(string, string) bool)(value, ref)
+	} else if operator == "!=" {
+		truth = true
 	}
 
 	return
