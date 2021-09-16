@@ -18,8 +18,10 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	jp "github.com/ohler55/ojg/jp"
@@ -52,11 +54,12 @@ var operations = map[string]interface{}{
 	"!=": neq,
 }
 
+var connections []net.Conn
+
 func main() {
 	flag.Parse()
 
 	fmt.Println("Starting server...")
-	// os.Remove(DB_FILE)
 
 	src := *addr + ":" + strconv.Itoa(*port)
 	listener, _ := net.Listen("tcp", src)
@@ -64,17 +67,28 @@ func main() {
 
 	defer listener.Close()
 
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-c
+		quitConnections()
+		os.Remove(DB_FILE)
+		os.Exit(1)
+	}()
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Printf("Some connection error: %s\n", err)
 		}
 
-		go handleConnection(conn)
+		go handleConnection(c, conn)
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(c chan os.Signal, conn net.Conn) {
+	connections = append(connections, conn)
 	remoteAddr := conn.RemoteAddr().String()
 	fmt.Println("Client connected from " + remoteAddr)
 
@@ -108,6 +122,12 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
+func quitConnections() {
+	for _, conn := range connections {
+		conn.Write([]byte("%quit%\n"))
+	}
+}
+
 func handleMessage(message string, conn net.Conn) (mode ConnectionMode, data []byte) {
 	fmt.Println("> " + message)
 
@@ -119,13 +139,6 @@ func handleMessage(message string, conn net.Conn) (mode ConnectionMode, data []b
 
 		case strings.HasPrefix(message, "/query"):
 			mode = QUERY
-
-		case message == "/quit":
-			fmt.Println("Quitting.")
-			conn.Write([]byte("I'm shutting down now.\n"))
-			fmt.Println("< " + "%quit%")
-			conn.Write([]byte("%quit%\n"))
-			os.Exit(0)
 
 		default:
 			conn.Write([]byte("Unrecognized command.\n"))
@@ -169,7 +182,6 @@ func streamRecords(conn net.Conn, data []byte) (err error) {
 	var qs []string
 
 	query := string(data)
-	// conn.Write([]byte(fmt.Sprintf("query: %s\n", query)))
 
 	for key, _ := range operations {
 		if strings.Contains(query, key) {
