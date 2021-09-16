@@ -111,6 +111,8 @@ func handleConnection(c chan os.Signal, conn net.Conn) {
 	fmt.Println("Client connected from " + remoteAddr)
 
 	scanner := bufio.NewScanner(conn)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 209715200)
 
 	var mode ConnectionMode = NONE
 	var f *os.File
@@ -122,6 +124,8 @@ func handleConnection(c chan os.Signal, conn net.Conn) {
 		ok := scanner.Scan()
 
 		if !ok {
+			err := scanner.Err()
+			fmt.Printf("err: %v\n", err)
 			break
 		}
 
