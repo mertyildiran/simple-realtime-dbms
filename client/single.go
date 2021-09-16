@@ -11,65 +11,22 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
 var host = flag.String("host", "localhost", "The hostname or IP to connect to; defaults to \"localhost\".")
 var port = flag.Int("port", 8000, "The port to connect to; defaults to 8000.")
-
-type Car struct {
-	Id    int      `json:"id"`
-	Model string   `json:"model"`
-	Brand CarBrand `json:"brand"`
-	Year  int      `json:"year"`
-}
-
-type CarBrand struct {
-	Name string `json:"name"`
-}
-
-type School struct {
-	Id         int          `json:"id"`
-	Name       string       `json:"name"`
-	League     SchoolLeague `json:"league"`
-	Address    string       `json:"address"`
-	Enrollment int          `json:"enrollment"`
-	Score      float64      `json:"score"`
-	Year       int          `json:"year"`
-}
-
-type SchoolLeague struct {
-	Name string `json:"name"`
-}
+var index = flag.Uint("index", 0, "Index of the record.")
 
 func main() {
 	flag.Parse()
-
-	a := &Car{
-		Model: "Camaro",
-		Brand: CarBrand{
-			Name: "Chevrolet",
-		},
-		Year: 2021,
-	}
-
-	b := &School{
-		Name: "Harvard",
-		League: SchoolLeague{
-			Name: "Ivy",
-		},
-		Address:    "Massachusetts",
-		Enrollment: 5000,
-		Score:      4.8,
-		Year:       1636,
-	}
 
 	dest := *host + ":" + strconv.Itoa(*port)
 	fmt.Printf("Connecting to %s...\n", dest)
@@ -85,34 +42,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	go readConnection(conn)
+	var wg sync.WaitGroup
+	go readConnection(&wg, conn)
+	wg.Add(1)
 
 	conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
-	conn.Write([]byte("/insert\n"))
+	conn.Write([]byte("/single\n"))
 
-	var data []byte
-	for i := 0; i < 100000; i++ {
-		conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
-		if i%2 == 1 {
-			b.Id = i - 1
-			data, _ = json.Marshal(b)
-		} else {
-			a.Id = i - 1
-			data, _ = json.Marshal(a)
-		}
+	conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
+	conn.Write([]byte(fmt.Sprintf("%d\n", *index)))
 
-		conn.Write(data)
-
-		conn.Write([]byte("\n"))
-
-		time.Sleep(1 * time.Millisecond)
-	}
-
-	for {
-	}
+	wg.Wait()
 }
 
-func readConnection(conn net.Conn) {
+func readConnection(wg *sync.WaitGroup, conn net.Conn) {
+	defer wg.Done()
 	for {
 		scanner := bufio.NewScanner(conn)
 
@@ -123,6 +67,7 @@ func readConnection(conn net.Conn) {
 			command := handleCommands(text)
 			if !command {
 				fmt.Printf("\b\b** %s\n> ", text)
+				os.Exit(0)
 			}
 
 			if !ok {

@@ -37,6 +37,15 @@ const (
 	NONE ConnectionMode = iota
 	INSERT
 	QUERY
+	SINGLE
+)
+
+type Commands int
+
+const (
+	CMD_INSERT string = "/insert"
+	CMD_QUERY  string = "/query"
+	CMD_SINGLE string = "/single"
 )
 
 const DB_FILE string = "data.bin"
@@ -55,6 +64,7 @@ var operations = map[string]interface{}{
 }
 
 var connections []net.Conn
+var offsets []int64
 
 func main() {
 	flag.Parse()
@@ -112,6 +122,8 @@ func handleConnection(c chan os.Signal, conn net.Conn) {
 			insertData(data)
 		case QUERY:
 			streamRecords(conn, data)
+		case SINGLE:
+			retrieveSingle(conn, data)
 		}
 	}
 
@@ -133,12 +145,15 @@ func handleMessage(message string, conn net.Conn) (mode ConnectionMode, data []b
 
 	if len(message) > 0 && message[0] == '/' {
 		switch {
-		case message == "/insert":
+		case message == CMD_INSERT:
 			mode = INSERT
 			return
 
-		case strings.HasPrefix(message, "/query"):
+		case strings.HasPrefix(message, CMD_QUERY):
 			mode = QUERY
+
+		case message == CMD_SINGLE:
+			mode = SINGLE
 
 		default:
 			conn.Write([]byte("Unrecognized command.\n"))
@@ -162,10 +177,10 @@ func insertData(data []byte) {
 
 	defer f.Close()
 
-	var len int64 = int64(len(data))
+	var length int64 = int64(len(data))
 
 	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(len))
+	binary.LittleEndian.PutUint64(b, uint64(length))
 	n, err := f.Write(b)
 	check(err)
 	fmt.Printf("wrote %d bytes\n", n)
@@ -174,7 +189,36 @@ func insertData(data []byte) {
 	check(err)
 	fmt.Printf("wrote %d bytes\n", n)
 
+	if len(offsets) == 0 {
+		offsets = append(offsets, 8+length)
+	} else {
+		lastOffset := offsets[len(offsets)-1]
+		offsets = append(offsets, lastOffset+8+length)
+	}
+
 	f.Sync()
+}
+
+func readRecord(f *os.File, seek int64) (b []byte, n int64, err error) {
+	n = seek
+	l := make([]byte, 8)
+	_, err = io.ReadAtLeast(f, l, 8)
+	if err == io.EOF {
+		return
+	}
+	n += 8
+	check(err)
+	length := int(binary.LittleEndian.Uint64(l))
+
+	b = make([]byte, length)
+	_, err = io.ReadAtLeast(f, b, length)
+	if err == io.EOF {
+		n -= 8
+		return
+	}
+	n += int64(length)
+	check(err)
+	return
 }
 
 func streamRecords(conn net.Conn, data []byte) (err error) {
@@ -214,23 +258,11 @@ func streamRecords(conn net.Conn, data []byte) (err error) {
 		f.Seek(n, 0)
 
 		for {
-			l := make([]byte, 8)
-			_, err = io.ReadAtLeast(f, l, 8)
+			var b []byte
+			b, n, err = readRecord(f, n)
 			if err == io.EOF {
 				break
 			}
-			n += 8
-			check(err)
-			length := int(binary.LittleEndian.Uint64(l))
-
-			b := make([]byte, length)
-			_, err = io.ReadAtLeast(f, b, length)
-			if err == io.EOF {
-				n -= 8
-				break
-			}
-			n += int64(length)
-			check(err)
 
 			truth, err := JsonPath(path, string(b), value, operator)
 			check(err)
@@ -286,5 +318,17 @@ func JsonPath(path string, text string, ref string, operator string) (truth bool
 		truth = operations[operator].(func(string, string) bool)(value, ref)
 	}
 
+	return
+}
+
+func retrieveSingle(conn net.Conn, data []byte) (err error) {
+	index, _ := strconv.Atoi(string(data))
+	n := offsets[index]
+	f, err := os.Open(DB_FILE)
+	check(err)
+	f.Seek(offsets[index], 0)
+	var b []byte
+	b, n, err = readRecord(f, n)
+	conn.Write([]byte(fmt.Sprintf("%s\n", b)))
 	return
 }
