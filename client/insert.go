@@ -91,7 +91,7 @@ func main() {
 	conn.Write([]byte("/insert\n"))
 
 	var data []byte
-	for i := 1; i < 101; i++ {
+	for i := 1; i < 100001; i++ {
 		conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 		if i%2 == 1 {
 			b.Id = i
@@ -105,7 +105,7 @@ func main() {
 
 		conn.Write([]byte("\n"))
 
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 	}
 
 	for {

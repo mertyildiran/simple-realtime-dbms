@@ -20,6 +20,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	jp "github.com/ohler55/ojg/jp"
 	oj "github.com/ohler55/ojg/oj"
@@ -189,32 +190,46 @@ func streamRecords(conn net.Conn, data []byte) (err error) {
 	fmt.Printf("value: %v\n", value)
 	fmt.Printf("operator: %v\n", operator)
 
-	f, err := os.Open(DB_FILE)
-	check(err)
-	f.Seek(0, 0)
+	var n int64 = 0
+	var i int = 0
 
 	for {
-		l := make([]byte, 8)
-		_, err = io.ReadAtLeast(f, l, 8)
-		if err == io.EOF {
-			break
+		time.Sleep(10 * time.Millisecond)
+		f, err := os.Open(DB_FILE)
+		if err != nil {
+			continue
 		}
-		check(err)
-		length := int(binary.LittleEndian.Uint64(l))
+		f.Seek(n, 0)
 
-		b := make([]byte, length)
-		_, err = io.ReadAtLeast(f, b, length)
-		if err == io.EOF {
-			break
+		for {
+			l := make([]byte, 8)
+			_, err = io.ReadAtLeast(f, l, 8)
+			if err == io.EOF {
+				break
+			}
+			n += 8
+			check(err)
+			length := int(binary.LittleEndian.Uint64(l))
+
+			b := make([]byte, length)
+			_, err = io.ReadAtLeast(f, b, length)
+			if err == io.EOF {
+				n -= 8
+				break
+			}
+			n += int64(length)
+			check(err)
+
+			truth, err := JsonPath(path, string(b), value, operator)
+			check(err)
+
+			if truth {
+				conn.Write([]byte(fmt.Sprintf("%s\n", b)))
+			}
 		}
-		check(err)
 
-		truth, err := JsonPath(path, string(b), value, operator)
-		check(err)
-
-		if truth {
-			conn.Write([]byte(fmt.Sprintf("%s\n", b)))
-		}
+		f.Close()
+		i++
 	}
 
 	return

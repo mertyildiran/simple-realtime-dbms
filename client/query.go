@@ -17,6 +17,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -41,7 +42,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	go readConnection(conn)
+	var wg sync.WaitGroup
+	go readConnection(&wg, conn)
+	wg.Add(1)
 
 	conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 	conn.Write([]byte("/query\n"))
@@ -49,11 +52,11 @@ func main() {
 	conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 	conn.Write([]byte(fmt.Sprintf("%s\n", *query)))
 
-	for {
-	}
+	wg.Wait()
 }
 
-func readConnection(conn net.Conn) {
+func readConnection(wg *sync.WaitGroup, conn net.Conn) {
+	defer wg.Done()
 	for {
 		scanner := bufio.NewScanner(conn)
 
