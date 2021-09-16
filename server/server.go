@@ -212,7 +212,7 @@ func readRecord(f *os.File, seek int64) (b []byte, n int64, err error) {
 	n = seek
 	l := make([]byte, 8)
 	_, err = io.ReadAtLeast(f, l, 8)
-	if err == io.EOF {
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		return
 	}
 	n += 8
@@ -221,7 +221,7 @@ func readRecord(f *os.File, seek int64) (b []byte, n int64, err error) {
 
 	b = make([]byte, length)
 	_, err = io.ReadAtLeast(f, b, length)
-	if err == io.EOF {
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		n -= 8
 		return
 	}
@@ -269,7 +269,7 @@ func streamRecords(conn net.Conn, data []byte) (err error) {
 		for {
 			var b []byte
 			b, n, err = readRecord(f, n)
-			if err == io.EOF {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				break
 			}
 
