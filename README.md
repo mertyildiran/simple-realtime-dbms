@@ -156,6 +156,10 @@ This time, the records of other struct will be printed.
 
 Also try the queries below:
 
+`go run client/query.go -host localhost -port 8000`
+
+`go run client/query.go -host localhost -port 8000 -query ""`
+
 `go run client/query.go -host localhost -port 8000 -query "id == 3"`
 
 `go run client/query.go -host localhost -port 8000 -query "model == \"Camaro\""`

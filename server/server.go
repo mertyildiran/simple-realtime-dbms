@@ -237,24 +237,26 @@ func streamRecords(conn net.Conn, data []byte) (err error) {
 
 	query := string(data)
 
-	for key, _ := range operations {
-		if strings.Contains(query, key) {
-			operator = key
-			qs = strings.Split(query, key)
+	if len(strings.TrimSpace(query)) != 0 {
+		for key, _ := range operations {
+			if strings.Contains(query, key) {
+				operator = key
+				qs = strings.Split(query, key)
+			}
 		}
+
+		if operator == "" {
+			err = errors.New("Unidentified operation.")
+		}
+
+		path = strings.TrimSpace(qs[0])
+		value = strings.TrimSpace(qs[1])
+		value = strings.Trim(value, "\"")
+
+		fmt.Printf("path: %v\n", path)
+		fmt.Printf("value: %v\n", value)
+		fmt.Printf("operator: %v\n", operator)
 	}
-
-	if operator == "" {
-		err = errors.New("Unidentified operation.")
-	}
-
-	path = strings.TrimSpace(qs[0])
-	value = strings.TrimSpace(qs[1])
-	value = strings.Trim(value, "\"")
-
-	fmt.Printf("path: %v\n", path)
-	fmt.Printf("value: %v\n", value)
-	fmt.Printf("operator: %v\n", operator)
 
 	var n int64 = 0
 	var i int = 0
@@ -274,8 +276,13 @@ func streamRecords(conn net.Conn, data []byte) (err error) {
 				break
 			}
 
-			truth, err := JsonPath(path, string(b), value, operator)
-			check(err)
+			var truth bool
+			if path != "" {
+				truth, err = JsonPath(path, string(b), value, operator)
+				check(err)
+			} else {
+				truth = true
+			}
 
 			if truth {
 				conn.Write([]byte(fmt.Sprintf("%s\n", b)))
