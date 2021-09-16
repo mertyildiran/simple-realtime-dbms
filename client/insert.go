@@ -91,7 +91,7 @@ func main() {
 	conn.Write([]byte("/insert\n"))
 
 	var data []byte
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < 10000000; i++ {
 		fmt.Printf("%d\n", i)
 		conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 		if i%2 == 1 {
@@ -106,6 +106,7 @@ func main() {
 
 		conn.Write([]byte("\n"))
 
+		// Comment out the line below to really stress things out
 		time.Sleep(1 * time.Millisecond)
 	}
 
