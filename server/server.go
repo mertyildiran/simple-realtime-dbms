@@ -12,6 +12,7 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -64,13 +66,28 @@ var operations = map[string]interface{}{
 }
 
 var connections []net.Conn
-var offsets []int64
+
+var cs ConcurrentSlice
+
+type ConcurrentSlice struct {
+	sync.RWMutex
+	lastOffset int64
+	offsets    []int64
+}
+
+func (cs *ConcurrentSlice) Append(offset int64) {
+	cs.Lock()
+	defer cs.Unlock()
+
+	cs.offsets = append(cs.offsets, offset)
+}
 
 func main() {
 	flag.Parse()
 
 	fmt.Println("Starting server...")
 	os.Remove(DB_FILE)
+	cs = ConcurrentSlice{}
 
 	src := *addr + ":" + strconv.Itoa(*port)
 	listener, _ := net.Listen("tcp", src)
@@ -193,6 +210,16 @@ func check(e error) {
 }
 
 func insertData(f *os.File, data []byte) {
+	var d map[string]interface{}
+	if err := json.Unmarshal(data, &d); err != nil {
+		panic(err)
+	}
+
+	cs.Lock()
+	l := len(cs.offsets)
+	d["id"] = l
+	data, _ = json.Marshal(d)
+
 	var length int64 = int64(len(data))
 
 	b := make([]byte, 8)
@@ -205,12 +232,9 @@ func insertData(f *os.File, data []byte) {
 	check(err)
 	fmt.Printf("wrote %d bytes\n", n)
 
-	if len(offsets) == 0 {
-		offsets = append(offsets, 8+length)
-	} else {
-		lastOffset := offsets[len(offsets)-1]
-		offsets = append(offsets, lastOffset+8+length)
-	}
+	cs.offsets = append(cs.offsets, cs.lastOffset)
+	cs.lastOffset = cs.lastOffset + 8 + length
+	cs.Unlock()
 }
 
 func readRecord(f *os.File, seek int64) (b []byte, n int64, err error) {
@@ -296,8 +320,6 @@ func streamRecords(conn net.Conn, data []byte) (err error) {
 		f.Close()
 		i++
 	}
-
-	return
 }
 
 func JsonPath(path string, text string, ref string, operator string) (truth bool, err error) {
@@ -346,14 +368,23 @@ func JsonPath(path string, text string, ref string, operator string) (truth bool
 
 func retrieveSingle(conn net.Conn, data []byte) (err error) {
 	index, _ := strconv.Atoi(string(data))
-	if index-1 > len(offsets) {
+
+	cs.RLock()
+	l := len(cs.offsets)
+	cs.RUnlock()
+
+	if index-1 > l {
 		conn.Write([]byte(fmt.Sprintf("Index out of range: %d\n", index)))
 		return
 	}
-	n := offsets[index]
+
+	cs.RLock()
+	n := cs.offsets[index]
+	cs.RUnlock()
+
 	f, err := os.Open(DB_FILE)
 	check(err)
-	f.Seek(offsets[index], 0)
+	f.Seek(n, 0)
 	var b []byte
 	b, n, err = readRecord(f, n)
 	conn.Write([]byte(fmt.Sprintf("%s\n", b)))
