@@ -179,7 +179,7 @@ func quitConnections() {
 }
 
 func handleMessage(message string, conn net.Conn) (mode ConnectionMode, data []byte) {
-	fmt.Println("> " + message)
+	// fmt.Println("> " + message)
 
 	if len(message) > 0 && message[0] == '/' {
 		switch {
